@@ -1,5 +1,6 @@
 """CPU functionality."""
 
+import re
 import sys
 
 class CPU:
@@ -7,9 +8,21 @@ class CPU:
 
     def __init__(self):
         """Construct a new CPU."""
-        pass
+        self.reg = [0] * 8
+        self.sp = self.reg[7]
+        self.ram = [None] * 256
+        self.pc = 0
+        self.running = True
+        
 
-    def load(self):
+    def ram_read(self, MAR):
+        return self.ram[MAR]
+
+    def ram_write(self, MAR, MDR):
+        self.ram[MAR] = MDR
+        print(f"Address: {MAR} = {MDR}")
+
+    def load(self, argument):
         """Load a program into memory."""
 
         address = 0
@@ -26,9 +39,16 @@ class CPU:
             0b00000001, # HLT
         ]
 
-        for instruction in program:
-            self.ram[address] = instruction
-            address += 1
+        try:
+            with open(argument, "r") as f:
+                program = f.read()
+
+            instructions = re.findall(r'\d{8}', program)
+            for address, instruction in enumerate(instructions):
+                x = int(instruction, 2)
+                self.ram[address] = x
+        except FileNotFoundError:
+            print("File error from CL")
 
 
     def alu(self, op, reg_a, reg_b):
@@ -37,6 +57,11 @@ class CPU:
         if op == "ADD":
             self.reg[reg_a] += self.reg[reg_b]
         #elif op == "SUB": etc
+        elif op == "SUB":
+            self.reg[reg_a] += -self.reg[reg_b]
+        elif op == "MUL":
+            product = self.reg[reg_a] * self.reg[reg_b]
+            self.reg[reg_a] = product
         else:
             raise Exception("Unsupported ALU operation")
 
@@ -62,4 +87,31 @@ class CPU:
 
     def run(self):
         """Run the CPU."""
-        pass
+
+        LDI  = 0b10000010 
+        PRN = 0b01000111		        
+        HLT = 0b00000001		
+        MUL = 0b10100010
+
+
+
+        while self.running:
+            IR = self.ram_read(self.pc)
+            operand_a = self.ram_read(self.pc + 1)
+            operand_b = self.ram_read(self.pc + 2)
+
+            if IR == HLT:
+                self.running = False
+            elif IR == LDI:
+                self.reg[operand_a] = operand_b
+                self.pc += 3
+            elif IR == PRN:
+                print(self.reg[operand_a])
+                self.pc += 2
+            elif IR == MUL:
+                self.alu("MUL", operand_a, operand_b)
+                self.pc += 3
+
+        self.trace()
+
+    
